@@ -37,7 +37,7 @@ const ui = `<!doctype html>
 
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
         min-height: 100vh;
         padding: 20px;
         color: #333;
@@ -56,7 +56,7 @@ const ui = `<!doctype html>
       }
 
       .header {
-        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
+        background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
         color: white;
         padding: 24px;
         display: flex;
@@ -64,6 +64,7 @@ const ui = `<!doctype html>
         align-items: center;
         flex-wrap: wrap;
         gap: 16px;
+        border-bottom: 3px solid #E67A28;
       }
 
       .header h1 {
@@ -89,8 +90,8 @@ const ui = `<!doctype html>
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: #4ade80;
-        box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+        background: #E67A28;
+        box-shadow: 0 0 8px rgba(230, 122, 40, 0.6);
       }
 
       .status-dot.disconnected {
@@ -121,14 +122,17 @@ const ui = `<!doctype html>
       }
 
       button {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.15);
         color: white;
         backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
       }
 
       button:hover {
-        background: rgba(255, 255, 255, 0.3);
+        background: #E67A28;
+        border-color: #E67A28;
         transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(230, 122, 40, 0.3);
       }
 
       button:active {
@@ -192,9 +196,10 @@ const ui = `<!doctype html>
       }
 
       .message.user .message-bubble {
-        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
         color: white;
         border-bottom-right-radius: 4px;
+        border-left: 4px solid #E67A28;
       }
 
       .message.assistant .message-bubble {
@@ -202,6 +207,7 @@ const ui = `<!doctype html>
         color: #333;
         border: 1px solid #e2e8f0;
         border-bottom-left-radius: 4px;
+        border-left: 4px solid #E67A28;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
       }
 
@@ -263,20 +269,23 @@ const ui = `<!doctype html>
       }
 
       .send-button {
-        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
         color: white;
         padding: 12px 32px;
         font-weight: 600;
         border-radius: 8px;
-        border: none;
+        border: 2px solid #E67A28;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.3s ease;
         white-space: nowrap;
         height: 60px;
       }
 
       .send-button:hover {
-        opacity: 0.9;
+        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
+        border-color: #F08033;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(230, 122, 40, 0.4);
       }
 
       .empty-state {
@@ -319,9 +328,9 @@ const ui = `<!doctype html>
         border-radius: 4px;
       }
 
-            ::-webkit-scrollbar-thumb:hover {
-              background: #94a3b8;
-            }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #E67A28;
+      }
 
             .typing-indicator {
               display: none;
@@ -396,7 +405,8 @@ const ui = `<!doctype html>
             }
 
             .info-icon:hover {
-              background: rgba(255, 255, 255, 0.5);
+              background: #E67A28;
+              box-shadow: 0 0 12px rgba(230, 122, 40, 0.5);
             }
 
             .info-tooltip {
