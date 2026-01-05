@@ -37,7 +37,7 @@ const ui = `<!doctype html>
 
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
+        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
         min-height: 100vh;
         padding: 20px;
         color: #333;
@@ -56,7 +56,7 @@ const ui = `<!doctype html>
       }
 
       .header {
-        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
+        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
         color: white;
         padding: 24px;
         display: flex;
@@ -259,11 +259,11 @@ const ui = `<!doctype html>
 
       textarea:focus {
         outline: none;
-        border-color: #F6821F;
+        border-color: #E67A28;
       }
 
       .send-button {
-        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
+        background: linear-gradient(135deg, #E67A28 0%, #F08033 100%);
         color: white;
         padding: 12px 32px;
         font-weight: 600;
@@ -351,7 +351,7 @@ const ui = `<!doctype html>
               width: 8px;
               height: 8px;
               border-radius: 50%;
-              background: #F6821F;
+              background: #E67A28;
               animation: typing 1.4s infinite;
             }
 
@@ -520,6 +520,9 @@ const ui = `<!doctype html>
       }
 
       function showTyping() {
+        // Don't create duplicate indicators
+        if (typingIndicator) return;
+
         // Remove empty state if present
         const emptyState = messagesEl.querySelector('.empty-state');
         if (emptyState) emptyState.remove();
@@ -558,9 +561,6 @@ const ui = `<!doctype html>
         ws.onmessage = (e) => {
           console.log("Received message:", e.data);
 
-          // Hide typing indicator when we get any response
-          hideTyping();
-
           try {
             const data = JSON.parse(e.data);
 
@@ -596,10 +596,12 @@ const ui = `<!doctype html>
 
             // Only show messages that look like actual content
             if (data.answer || data.error || (!data.type && !data.mcp && !data.state)) {
+              hideTyping(); // Hide indicator only when displaying actual message
               addMessage(data, 'assistant');
             }
           } catch (err) {
             // If not JSON, treat as plain text - this is the actual AI response
+            hideTyping(); // Hide indicator only when displaying actual message
             addMessage(e.data, 'assistant');
           }
         };
@@ -608,11 +610,13 @@ const ui = `<!doctype html>
           console.error("WebSocket error:", error);
           console.error("WebSocket readyState:", ws?.readyState);
           updateStatus(false);
+          hideTyping(); // Remove indicator on error
         };
 
         ws.onclose = (event) => {
           console.log("WebSocket closed. Code:", event.code, "Reason:", event.reason, "Was clean:", event.wasClean);
           updateStatus(false);
+          hideTyping(); // Remove indicator on close
           console.log("Disconnected. Reconnecting in 3 seconds...");
           setTimeout(connect, 3000);
         };
