@@ -322,6 +322,18 @@ const ui = `<!doctype html>
 
             .typing-indicator {
               display: none;
+              flex-direction: column;
+              gap: 8px;
+              align-items: flex-start;
+            }
+
+            .typing-indicator.show {
+              display: flex;
+              animation: fadeIn 0.3s ease-in;
+            }
+
+            .typing-bubble {
+              display: flex;
               align-items: center;
               gap: 8px;
               padding: 12px 16px;
@@ -329,12 +341,7 @@ const ui = `<!doctype html>
               border: 1px solid #e2e8f0;
               border-radius: 12px;
               border-bottom-left-radius: 4px;
-              max-width: 80px;
-              margin-bottom: 16px;
-            }
-
-            .typing-indicator.show {
-              display: flex;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             }
 
             .typing-dot {
@@ -395,11 +402,6 @@ const ui = `<!doctype html>
             </svg>
             <p>Select a persona and start chatting with the edge!</p>
           </div>
-          <div class="typing-indicator" id="typingIndicator">
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-          </div>
         </div>
 
         <div class="input-area">
@@ -422,10 +424,10 @@ const ui = `<!doctype html>
       const sendBtn = document.getElementById("sendBtn");
       const statusDot = document.getElementById("statusDot");
       const statusText = document.getElementById("statusText");
-      const typingIndicator = document.getElementById("typingIndicator");
 
       let ws = null;
       let messageHistory = [];
+      let typingIndicator = null;
 
       function updateStatus(connected) {
         if (connected) {
@@ -434,6 +436,32 @@ const ui = `<!doctype html>
         } else {
           statusDot.classList.add("disconnected");
           statusText.textContent = "Disconnected";
+        }
+      }
+
+      function showTyping() {
+        // Remove empty state if present
+        const emptyState = messagesEl.querySelector('.empty-state');
+        if (emptyState) emptyState.remove();
+
+        // Create typing indicator element
+        typingIndicator = document.createElement('div');
+        typingIndicator.className = 'typing-indicator show';
+        typingIndicator.innerHTML = \`
+          <div class="typing-bubble">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        \`;
+        messagesEl.appendChild(typingIndicator);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function hideTyping() {
+        if (typingIndicator) {
+          typingIndicator.remove();
+          typingIndicator = null;
         }
       }
 
@@ -451,7 +479,7 @@ const ui = `<!doctype html>
           console.log("Received message:", e.data);
 
           // Hide typing indicator when we get any response
-          typingIndicator.classList.remove('show');
+          hideTyping();
 
           try {
             const data = JSON.parse(e.data);
@@ -561,8 +589,7 @@ const ui = `<!doctype html>
         msgInput.value = '';
 
         // Show typing indicator while waiting for response
-        typingIndicator.classList.add('show');
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        showTyping();
 
         ws.send(JSON.stringify({
           persona: personaSelect.value,
