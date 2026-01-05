@@ -1,18 +1,27 @@
-// Entry Worker that serves UI + upgrades to Agent (WebSocket)
+/**
+ * Main Worker entry point
+ *
+ * This file does three things:
+ * 1. Serves the chat UI (inline HTML, no separate files needed)
+ * 2. Routes WebSocket connections to the EdgePersonaAgent Durable Object
+ * 3. Handles the /api/replay endpoint for Workflow-based analysis
+ *
+ * The UI is embedded as a template string so everything deploys as one bundle.
+ */
 
 import type { AgentNamespace } from "agents";
 import { routeAgentRequest, getAgentByName } from "agents";
 import { EdgePersonaAgent } from "./agent";
 import { EPSReplayWorkflow } from "./workflow";
 
-// CRITICAL: Export the Durable Object and Workflow classes from the entry module
+// Export classes so Cloudflare can instantiate them
 export { EdgePersonaAgent };
 export { EPSReplayWorkflow };
 
-// Force-bundle the agent class to ensure it's included in the Worker bundle
+// Make sure the agent code gets bundled even if not directly imported
 import "./agent";
 
-// Use the beautiful UI from index.html
+// The entire chat UI in one string - gets served at the root path
 const ui = `<!doctype html>
 <html lang="en">
   <head>
@@ -307,12 +316,56 @@ const ui = `<!doctype html>
         border-radius: 4px;
       }
 
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
-    </style>
-  </head>
-  <body>
+            ::-webkit-scrollbar-thumb:hover {
+              background: #94a3b8;
+            }
+
+            .typing-indicator {
+              display: none;
+              align-items: center;
+              gap: 8px;
+              padding: 12px 16px;
+              background: white;
+              border: 1px solid #e2e8f0;
+              border-radius: 12px;
+              border-bottom-left-radius: 4px;
+              max-width: 80px;
+              margin-bottom: 16px;
+            }
+
+            .typing-indicator.show {
+              display: flex;
+            }
+
+            .typing-dot {
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #667eea;
+              animation: typing 1.4s infinite;
+            }
+
+            .typing-dot:nth-child(2) {
+              animation-delay: 0.2s;
+            }
+
+            .typing-dot:nth-child(3) {
+              animation-delay: 0.4s;
+            }
+
+            @keyframes typing {
+              0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+              }
+              30% {
+                transform: translateY(-10px);
+                opacity: 1;
+              }
+            }
+          </style>
+        </head>
+        <body>
     <div class="container">
       <div class="header">
         <h1>🌐 Edge Persona Simulator</h1>
@@ -342,6 +395,11 @@ const ui = `<!doctype html>
             </svg>
             <p>Select a persona and start chatting with the edge!</p>
           </div>
+          <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
         </div>
 
         <div class="input-area">
@@ -364,6 +422,7 @@ const ui = `<!doctype html>
       const sendBtn = document.getElementById("sendBtn");
       const statusDot = document.getElementById("statusDot");
       const statusText = document.getElementById("statusText");
+      const typingIndicator = document.getElementById("typingIndicator");
 
       let ws = null;
       let messageHistory = [];
@@ -390,6 +449,10 @@ const ui = `<!doctype html>
 
         ws.onmessage = (e) => {
           console.log("Received message:", e.data);
+
+          // Hide typing indicator when we get any response
+          typingIndicator.classList.remove('show');
+
           try {
             const data = JSON.parse(e.data);
 
@@ -496,6 +559,10 @@ const ui = `<!doctype html>
 
         addMessage(message, 'user');
         msgInput.value = '';
+
+        // Show typing indicator while waiting for response
+        typingIndicator.classList.add('show');
+        messagesEl.scrollTop = messagesEl.scrollHeight;
 
         ws.send(JSON.stringify({
           persona: personaSelect.value,
@@ -609,7 +676,8 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(req.url);
 
-    // 1) Serve UI (static HTML) with no-cache headers to prevent CDN/browser caching
+    // Route 1: Serve the chat UI
+    // No-cache headers prevent the browser from caching old versions
     if (url.pathname === "/" || url.pathname === "/index.html") {
       return new Response(ui, {
         headers: {
@@ -621,15 +689,17 @@ export default {
       });
     }
 
-    // 2) Handle Agent connections at /agents/EdgePersonaAgent/:roomId
-    // We manually forward to the Durable Object with required headers
+    // Route 2: WebSocket connections to the Agent
+    // Pattern: /agents/EdgePersonaAgent/:roomId
+    // The roomId becomes the Durable Object instance name (we use "room-v5" to force fresh instances)
     const agentMatch = url.pathname.match(/^\/agents\/EdgePersonaAgent\/(.+)$/);
     if (agentMatch) {
       const roomId = agentMatch[1];
       const id = env.EdgePersonaAgent.idFromName(roomId);
       const stub = env.EdgePersonaAgent.get(id);
 
-      // Add the required namespace/room headers the Agent expects
+      // The Agents SDK expects these headers for proper WebSocket routing
+      // Without them, the connection fails with "Missing namespace or room headers"
       const headers = new Headers(req.headers);
       headers.set("x-partykit-namespace", "EdgePersonaAgent");
       headers.set("x-partykit-room", roomId);
@@ -643,7 +713,8 @@ export default {
       return stub.fetch(modifiedRequest);
     }
 
-    // 3) Feature 3: Workflows endpoint for Replay/Postmortem
+    // Route 3: Workflow API for multi-step Replay/Postmortem analysis
+    // This triggers a durable workflow that runs multiple AI calls in sequence
     if (url.pathname === "/api/replay" && req.method === "POST") {
       try {
         const body = (await req.json()) as {
@@ -654,15 +725,17 @@ export default {
         };
         const { sessionId, persona, message, mode } = body;
 
-        // Generate a valid workflow ID (alphanumeric and hyphens only)
+        // Workflow IDs can only contain alphanumeric chars and hyphens
         const workflowId = `eps-${sessionId}-${mode}-${Date.now()}`.replace(/[^a-zA-Z0-9-]/g, '-');
 
+        // Start the workflow - it runs in the background durably
         const instance = await env.EPS_REPLAY_WF.create({
           id: workflowId,
           params: { sessionId, persona, userMessage: message, mode },
         });
 
-        // Poll for workflow completion (max 30 seconds)
+        // Workflows are async, so we poll until completion
+        // Each workflow takes 5-15 seconds (two AI calls + processing)
         const maxAttempts = 30;
         let attempts = 0;
         let result;
@@ -674,13 +747,15 @@ export default {
             break;
           }
 
-          // Wait 1 second before polling again
+          // Check every second
           await new Promise(resolve => setTimeout(resolve, 1000));
           attempts++;
         }
 
         if (result?.status === "complete" && result?.output) {
-          // Format as plain text for better readability
+          // Workflow completed successfully - format the output nicely
+          // The workflow returns { title, analysis, result }
+          // We format it as readable text instead of JSON
           const output = result.output;
           let formattedText = '';
 

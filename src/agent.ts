@@ -1,9 +1,16 @@
-// The core Agent (state + memory + LLM + reasoning)
+/**
+ * EdgePersonaAgent - The main AI agent that simulates Cloudflare edge components
+ *
+ * This is a Durable Object that maintains state across WebSocket connections.
+ * Each connection gets a persistent agent that remembers the selected persona
+ * and can recall previous conversations using Vectorize.
+ */
 
 import { Agent, type Connection } from "agents";
 import { upsertMemory, queryMemory } from "./vector";
 import type { Env } from "./server";
 
+// All the edge components we can simulate
 type Persona =
   | "WAF"
   | "CDN_CACHE"
@@ -12,6 +19,7 @@ type Persona =
   | "WORKERS_RUNTIME"
   | "ZERO_TRUST";
 
+// Agent state that persists in the Durable Object
 type State = {
   persona: Persona;
 };
@@ -21,15 +29,14 @@ const DEFAULT_STATE: State = {
 };
 
 export class EdgePersonaAgent extends Agent<Env, State> {
-  // Store the current connection for sending messages
   private currentConnection: Connection | null = null;
-
   initialState: State = DEFAULT_STATE;
 
+  // Called when a WebSocket connection is established
   onConnect(connection: Connection) {
     this.currentConnection = connection;
 
-    // Send initial handshake
+    // Let the client know we're ready
     connection.send(
       JSON.stringify({
         ok: true,
@@ -39,25 +46,29 @@ export class EdgePersonaAgent extends Agent<Env, State> {
     );
   }
 
+  // Called when a message arrives from the client
   async onMessage(connection: Connection, raw: string) {
+    // Parse the incoming message (could be JSON or plain text)
     const parsed = safeJson(raw);
     const message = (parsed?.message ?? raw)?.toString().trim();
     const persona = (parsed?.persona ?? this.state?.persona ?? "WAF") as Persona;
-    const sessionId = this.name; // Use the DO name as session ID
+    const sessionId = this.name; // Durable Object name is our session ID
 
-    // Update persona if changed
+    // If user switched personas, update our state
     if (persona !== this.state?.persona) {
       this.setState({ persona });
     }
 
-    // Feature 2: Semantic Memory - Store user message in Vectorize
+    // Store this message in Vectorize so we can recall it later
+    // This gives the agent "memory" across conversations
     try {
       await upsertMemory(this.env, sessionId, `[USER] ${message}`, "user");
     } catch (e) {
       console.warn("Vectorize upsert error (non-fatal):", e);
     }
 
-    // Feature 2: Retrieve relevant memories
+    // Retrieve relevant past conversations to provide context
+    // Vectorize does semantic search to find related messages
     let memories: string[] = [];
     try {
       memories = await queryMemory(this.env, sessionId, message, 3);
@@ -65,9 +76,10 @@ export class EdgePersonaAgent extends Agent<Env, State> {
       console.warn("Vectorize query error (non-fatal):", e);
     }
 
+    // Build the system prompt for this persona, including relevant memories
     const systemPrompt = buildSystemPrompt(persona, memories);
 
-    // Workers AI call
+    // Call Workers AI to generate the response
     try {
       const result = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
         messages: [
@@ -78,7 +90,7 @@ export class EdgePersonaAgent extends Agent<Env, State> {
         max_tokens: 700,
       });
 
-      // Extract the text response from the AI result
+      // Workers AI can return results in different formats, so we handle all of them
       let responseText: string;
       if (typeof result === "string") {
         responseText = result;
@@ -90,13 +102,14 @@ export class EdgePersonaAgent extends Agent<Env, State> {
         responseText = JSON.stringify(result, null, 2);
       }
 
-      // Feature 2: Store assistant response in Vectorize
+      // Store the AI's response in Vectorize too (truncated to 500 chars)
       try {
         await upsertMemory(this.env, sessionId, `[ASSISTANT] ${responseText.substring(0, 500)}`, "assistant");
       } catch (e) {
         console.warn("Vectorize upsert error (non-fatal):", e);
       }
 
+      // Send response back to the client
       connection.send(responseText);
     } catch (e) {
       console.error("AI error:", e);
@@ -104,6 +117,7 @@ export class EdgePersonaAgent extends Agent<Env, State> {
     }
   }
 
+  // Clean up when connection closes
   onClose(connection: Connection) {
     if (this.currentConnection === connection) {
       this.currentConnection = null;
@@ -111,11 +125,17 @@ export class EdgePersonaAgent extends Agent<Env, State> {
   }
 }
 
+/**
+ * Build the system prompt for the AI based on which persona is active
+ * Includes relevant memories from previous conversations for context
+ */
 function buildSystemPrompt(persona: Persona, memories: string[]) {
+  // Add memory context if we have any relevant past conversations
   const memBlock = memories.length
     ? `\n\nRelevant conversation history:\n- ${memories.join("\n- ")}`
     : "";
 
+  // Each persona has its own personality and expertise
   const personaDescriptions: Record<Persona, string> = {
     WAF: "Cloudflare Web Application Firewall - I analyze HTTP requests for malicious patterns like SQL injection, XSS, and other OWASP threats. I use managed rulesets and custom rules to block attacks.",
     CDN_CACHE: "Cloudflare CDN Cache - I store and serve cached content from edge locations worldwide. I manage cache keys, TTLs, cache-control headers, and determine HIT/MISS/STALE states.",
@@ -125,6 +145,7 @@ function buildSystemPrompt(persona: Persona, memories: string[]) {
     ZERO_TRUST: "Cloudflare Zero Trust / Access - I enforce identity-based access policies, integrate with IdPs, manage device posture checks, and secure internal applications."
   };
 
+  // The actual prompt sent to Workers AI
   return `You are the ${persona} simulator - ${personaDescriptions[persona]}
 ${memBlock}
 
@@ -142,6 +163,7 @@ Keep responses concise but informative (2-4 short paragraphs max).
 Refuse any requests for illegal hacking instructions.`.trim();
 }
 
+// Helper to safely parse JSON without crashing
 function safeJson(x: string) {
   try {
     return JSON.parse(x);
