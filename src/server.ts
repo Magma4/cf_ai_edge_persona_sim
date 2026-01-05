@@ -44,7 +44,7 @@ const ui = `<!doctype html>
       }
 
       .container {
-        max-width: 1000px;
+        max-width: 1400px;
         margin: 0 auto;
         background: white;
         border-radius: 16px;
@@ -184,7 +184,7 @@ const ui = `<!doctype html>
       }
 
       .message-bubble {
-        max-width: 75%;
+        max-width: 85%;
         padding: 12px 16px;
         border-radius: 12px;
         word-wrap: break-word;
@@ -236,14 +236,12 @@ const ui = `<!doctype html>
         padding: 20px;
         background: white;
         border-top: 1px solid #e2e8f0;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
       }
 
       .input-row {
         display: flex;
         gap: 12px;
+        align-items: flex-end;
       }
 
       textarea {
@@ -254,7 +252,7 @@ const ui = `<!doctype html>
         font-size: 14px;
         font-family: inherit;
         resize: vertical;
-        min-height: 80px;
+        min-height: 60px;
         max-height: 200px;
         transition: border-color 0.2s;
       }
@@ -269,7 +267,12 @@ const ui = `<!doctype html>
         color: white;
         padding: 12px 32px;
         font-weight: 600;
-        align-self: flex-start;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        height: 60px;
       }
 
       .send-button:hover {
@@ -370,6 +373,65 @@ const ui = `<!doctype html>
                 opacity: 1;
               }
             }
+
+            .button-with-info {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+            }
+
+            .info-icon {
+              width: 18px;
+              height: 18px;
+              border-radius: 50%;
+              background: rgba(255, 255, 255, 0.3);
+              color: white;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              font-weight: bold;
+              cursor: help;
+              position: relative;
+            }
+
+            .info-icon:hover {
+              background: rgba(255, 255, 255, 0.5);
+            }
+
+            .info-tooltip {
+              visibility: hidden;
+              opacity: 0;
+              position: absolute;
+              top: 130%;
+              right: -10px;
+              background: #1e293b;
+              color: white;
+              padding: 12px 16px;
+              border-radius: 8px;
+              font-size: 13px;
+              line-height: 1.5;
+              width: 300px;
+              white-space: normal;
+              box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+              transition: opacity 0.2s, visibility 0.2s;
+              z-index: 10000;
+              pointer-events: none;
+            }
+
+            .info-tooltip::before {
+              content: '';
+              position: absolute;
+              bottom: 100%;
+              right: 20px;
+              border: 6px solid transparent;
+              border-bottom-color: #1e293b;
+            }
+
+            .info-icon:hover .info-tooltip {
+              visibility: visible;
+              opacity: 1;
+            }
           </style>
         </head>
         <body>
@@ -389,8 +451,26 @@ const ui = `<!doctype html>
             <option value="WORKERS_RUNTIME">⚡ Workers Runtime</option>
             <option value="ZERO_TRUST">🔒 Zero Trust</option>
           </select>
-          <button onclick="replay('replay')">🔁 Replay</button>
-          <button onclick="replay('postmortem')">📋 Postmortem</button>
+          <div class="button-with-info">
+            <button onclick="replay('replay')">🔁 Replay</button>
+            <div class="info-icon">
+              i
+              <div class="info-tooltip">
+                <strong>Replay Analysis</strong><br>
+                Type a scenario, then click Replay to run a multi-step "what-if" analysis. The AI will analyze different security settings and predict outcomes.
+              </div>
+            </div>
+          </div>
+          <div class="button-with-info">
+            <button onclick="replay('postmortem')">📋 Postmortem</button>
+            <div class="info-icon">
+              i
+              <div class="info-tooltip">
+                <strong>Incident Postmortem</strong><br>
+                Type an incident, then click Postmortem to generate a structured report with root causes, mitigations, and follow-up actions.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -411,8 +491,8 @@ const ui = `<!doctype html>
               placeholder="Ask the edge component a question..."
               rows="3"
             ></textarea>
+            <button class="send-button" onclick="send()" id="sendBtn">Send Message</button>
           </div>
-          <button class="send-button" onclick="send()" id="sendBtn">Send Message</button>
         </div>
       </div>
     </div>
