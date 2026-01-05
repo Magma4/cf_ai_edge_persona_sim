@@ -37,7 +37,7 @@ const ui = `<!doctype html>
 
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
         min-height: 100vh;
         padding: 20px;
         color: #333;
@@ -56,7 +56,7 @@ const ui = `<!doctype html>
       }
 
       .header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
         color: white;
         padding: 24px;
         display: flex;
@@ -192,7 +192,7 @@ const ui = `<!doctype html>
       }
 
       .message.user .message-bubble {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
         color: white;
         border-bottom-right-radius: 4px;
       }
@@ -259,11 +259,11 @@ const ui = `<!doctype html>
 
       textarea:focus {
         outline: none;
-        border-color: #667eea;
+        border-color: #F6821F;
       }
 
       .send-button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #F6821F 0%, #FF8C42 100%);
         color: white;
         padding: 12px 32px;
         font-weight: 600;
@@ -351,7 +351,7 @@ const ui = `<!doctype html>
               width: 8px;
               height: 8px;
               border-radius: 50%;
-              background: #667eea;
+              background: #F6821F;
               animation: typing 1.4s infinite;
             }
 
